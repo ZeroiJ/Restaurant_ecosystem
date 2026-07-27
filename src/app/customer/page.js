@@ -39,6 +39,7 @@ function CustomerContent() {
   const [showFeedback, setShowFeedback] = useState(false);
   const [sentimentFeedback, setSentimentFeedback] = useState('');
   const [sentimentDone, setSentimentDone] = useState(false);
+  const [sentimentType, setSentimentType] = useState('happy');
 
   // Custom toast notifications for socket events
   const [toasts, setToasts] = useState([]);
@@ -715,22 +716,26 @@ function CustomerContent() {
             <div className="flex justify-center gap-6 mb-6">
               <button
                 onClick={() => {
-                  window.open('https://g.page/r/YOUR_GOOGLE_REVIEW_ID/review', '_blank');
-                  setSentimentDone(true);
-                  setTimeout(() => { setActiveOrder(null); setOrderStatus(''); setShowSentiment(false); setShowFeedback(false); }, 1000);
+                  setSentimentType('happy');
+                  setShowFeedback(true);
+                  setSentimentFeedback('');
                 }}
                 className="text-4xl p-4 rounded-2xl bg-zinc-800/50 hover:bg-zinc-800 hover:scale-110 transition-all cursor-pointer"
               >
                 <span role="img" aria-label="Happy">😊</span>
               </button>
               <button
-                onClick={() => { setShowFeedback(true); setSentimentFeedback(''); }}
+                onClick={() => {
+                  setSentimentType('sad');
+                  setShowFeedback(true);
+                  setSentimentFeedback('');
+                }}
                 className="text-4xl p-4 rounded-2xl bg-zinc-800/50 hover:bg-zinc-800 hover:scale-110 transition-all cursor-pointer"
               >
                 <span role="img" aria-label="Unhappy">😞</span>
               </button>
             </div>
-            <p className="text-[10px] text-zinc-500 font-light">😊 Happy → Google Review &nbsp;·&nbsp; 😞 Unhappy → Private</p>
+            <p className="text-[10px] text-zinc-500 font-light">😊 Happy → Private &nbsp;·&nbsp; 😞 Unhappy → Private</p>
           </div>
         </div>
       )}
@@ -739,26 +744,33 @@ function CustomerContent() {
       {showSentiment && showFeedback && !sentimentDone && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <h3 className="text-xl font-bold font-outfit text-zinc-100 mb-2">We&apos;re sorry</h3>
-            <p className="text-zinc-400 text-xs mb-4">Tell us what went wrong (private)</p>
+            <h3 className="text-xl font-bold font-outfit text-zinc-100 mb-2">
+              {sentimentType === 'happy' ? "We're so glad!" : "We're sorry"}
+            </h3>
+            <p className="text-zinc-400 text-xs mb-4">
+              {sentimentType === 'happy' ? "Tell us what you loved (private)" : "Tell us what went wrong (private)"}
+            </p>
             <textarea
               value={sentimentFeedback}
               onChange={(e) => setSentimentFeedback(e.target.value)}
               placeholder="Share your feedback..."
-              className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none focus:border-rose-500 transition-all duration-300 mb-4 min-h-[100px]"
+              className={`w-full bg-zinc-950 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-100 focus:outline-none transition-all duration-300 mb-4 min-h-[100px] ${
+                sentimentType === 'happy' ? 'focus:border-emerald-500' : 'focus:border-rose-500'
+              }`}
             />
             <button
               onClick={() => {
-                const fb = { feedback: sentimentFeedback, date: new Date().toISOString() };
+                const fb = { feedback: sentimentFeedback, type: sentimentType, date: new Date().toISOString() };
                 const existing = JSON.parse(localStorage.getItem('vibedine:feedback') || '[]');
                 existing.push(fb);
                 localStorage.setItem('vibedine:feedback', JSON.stringify(existing));
                 console.log('[Feedback]', fb);
-                // ponytail: localStorage feedback store, add API endpoint when feedback volume matters
                 setSentimentDone(true);
                 setTimeout(() => { setActiveOrder(null); setOrderStatus(''); setShowSentiment(false); setShowFeedback(false); }, 1000);
               }}
-              className="w-full py-3 rounded-xl bg-rose-500 hover:bg-rose-600 text-white font-bold text-sm transition-all cursor-pointer"
+              className={`w-full py-3 rounded-xl text-white font-bold text-sm transition-all cursor-pointer ${
+                sentimentType === 'happy' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-rose-500 hover:bg-rose-600'
+              }`}
             >
               Submit Feedback
             </button>

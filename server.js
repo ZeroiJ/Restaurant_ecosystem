@@ -11,6 +11,7 @@ const app = next({ dev });
 const handle = app.getRequestHandler();
 
 app.prepare().then(() => {
+  // Main Customer Server on Port 3000 (Centralized WebSockets host)
   const httpServer = createServer((req, res) => {
     const parsedUrl = parse(req.url, true);
     handle(req, res, parsedUrl);
@@ -146,6 +147,8 @@ app.prepare().then(() => {
       }
     }
   }, 5 * 60 * 1000);
+
+
 
   httpServer.listen(port, (err) => {
     if (err) throw err;

@@ -37,6 +37,10 @@ export default function ManagerDashboard() {
   const [generatingReport, setGeneratingReport] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(true);
 
+  // XGBoost ML report
+  const [mlReport, setMlReport] = useState(null);
+  const [generatingMLReport, setGeneratingMLReport] = useState(false);
+
   // Manual stock restock inputs
   const [restockItemId, setRestockItemId] = useState('');
   const [restockQty, setRestockQty] = useState('');
@@ -68,6 +72,21 @@ export default function ManagerDashboard() {
     }
   };
 
+  const fetchMLForecast = async () => {
+    setGeneratingMLReport(true);
+    try {
+      const res = await fetch('/api/ml-forecast');
+      const data = await res.json();
+      if (res.ok) {
+        setMlReport(data);
+      }
+    } catch (err) {
+      console.error('Failed to load ML predictions:', err);
+    } finally {
+      setGeneratingMLReport(false);
+    }
+  };
+
   useEffect(() => {
     // Authenticate manager session
     const stored = localStorage.getItem('user');
@@ -82,6 +101,7 @@ export default function ManagerDashboard() {
 
     setTimeout(() => {
       fetchDashboardData();
+      fetchMLForecast();
     }, 0);
   }, [router]);
 
@@ -359,6 +379,132 @@ export default function ManagerDashboard() {
                       <div>
                         <span className="text-[9px] font-bold text-emerald-450 uppercase tracking-wider block mb-1">Demand Projection</span>
                         <p className="text-zinc-300 text-xs leading-relaxed font-light">{aiReport.demandForecast}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* XGBoost Machine Learning Forecasts Card */}
+                <div className="rounded-3xl border border-zinc-800 bg-zinc-900/20 p-6 backdrop-blur-md">
+                  <h3 className="text-base font-bold font-outfit text-zinc-100 flex items-center gap-2 mb-6 pb-4 border-b border-zinc-900">
+                    <TrendingUp className="h-4.5 w-4.5 text-cyan-400 animate-pulse" />
+                    XGBoost ML Projections
+                  </h3>
+
+                  <p className="text-zinc-400 text-xs font-light leading-relaxed mb-6">
+                    Run native gradient boosted decision trees over historical orders to forecast menu demand and inventory depletion.
+                  </p>
+
+                  <button
+                    onClick={fetchMLForecast}
+                    disabled={generatingMLReport}
+                    className="w-full py-3.5 rounded-xl bg-gradient-to-r from-cyan-500 to-emerald-500 hover:from-cyan-600 hover:to-emerald-600 text-black font-bold text-xs shadow-lg cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 animate-pulse"
+                  >
+                    {generatingMLReport ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-black" />
+                        Running XGBoost Models...
+                      </>
+                    ) : (
+                      <>
+                        <TrendingUp className="h-4 w-4 text-black" />
+                        Run XGBoost ML Forecasts
+                      </>
+                    )}
+                  </button>
+
+                  {mlReport && (
+                    <div className="mt-8 space-y-6 animate-in fade-in duration-500">
+                      {/* Model Diagnostics */}
+                      <div className="p-3 rounded-xl bg-zinc-950/60 border border-zinc-850 text-[10px] text-zinc-500 flex justify-between items-center">
+                        <span>Status: <strong className="text-emerald-400">Trained</strong></span>
+                        <span>Engine: <strong className="text-cyan-400">{mlReport.modelDiagnostics.hasXGBoost ? 'XGBoost 3.3.0' : 'Sklearn GB'}</strong></span>
+                      </div>
+
+                      {/* Depletion velocity list */}
+                      <div>
+                        <span className="text-[9px] font-bold text-cyan-450 uppercase tracking-wider block mb-2">Estimated Depletion</span>
+                        <div className="space-y-2">
+                          {mlReport.inventoryPredictions.map((pred, idx) => {
+                            const isHigh = pred.riskLevel === 'High Risk';
+                            const isMed = pred.riskLevel === 'Medium Risk';
+                            return (
+                              <div key={idx} className="p-3 rounded-xl bg-zinc-950/40 border border-zinc-850 flex justify-between items-center text-xs">
+                                <div>
+                                  <span className="font-bold text-zinc-200 block">{pred.itemName}</span>
+                                  <span className="text-[10px] text-zinc-500">Usage: ~{pred.avgDailyConsumption} / day</span>
+                                </div>
+                                <div className="text-right">
+                                  <span className={`font-bold block ${isHigh ? 'text-rose-400' : isMed ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                    {pred.predictedDepletionDays === 99.0 ? 'Stable' : `${pred.predictedDepletionDays} days`}
+                                  </span>
+                                  <span className="text-[9px] text-zinc-500 font-light block uppercase">{pred.riskLevel}</span>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* demand forecast SVG line chart */}
+                      <div>
+                        <span className="text-[9px] font-bold text-emerald-450 uppercase tracking-wider block mb-3">7-Day Projected Demand</span>
+                        <div className="bg-zinc-950/50 p-4 rounded-2xl border border-zinc-850">
+                          {/* Legend */}
+                          <div className="flex flex-wrap gap-2.5 mb-3 text-[9px] text-zinc-400">
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-rose-500 block" /> Butter Chicken</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-500 block" /> Paneer Tikka</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-cyan-500 block" /> Naan Bread</span>
+                            <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-emerald-500 block" /> Mango Lassi</span>
+                          </div>
+
+                          {/* Chart SVG */}
+                          <svg className="w-full h-[120px]" viewBox="0 0 300 120">
+                            {/* Gridlines */}
+                            <line x1="20" y1="20" x2="280" y2="20" stroke="#1f2937" strokeWidth="0.5" strokeDasharray="3 3" />
+                            <line x1="20" y1="60" x2="280" y2="60" stroke="#1f2937" strokeWidth="0.5" strokeDasharray="3 3" />
+                            <line x1="20" y1="100" x2="280" y2="100" stroke="#374151" strokeWidth="1" />
+
+                            {/* Dynamically draw paths for top items */}
+                            {mlReport.demandForecast.filter(f => ['Butter Chicken Masala', 'Paneer Tikka Multani', 'Garlic Butter Naan', 'Mango Lassi'].includes(f.menuItemName)).map((item, itemIdx) => {
+                              const colors = {
+                                'Butter Chicken Masala': '#f43f5e',
+                                'Paneer Tikka Multani': '#f59e0b',
+                                'Garlic Butter Naan': '#06b6d4',
+                                'Mango Lassi': '#10b981'
+                              };
+                              const color = colors[item.menuItemName] || '#a1a1aa';
+                              const xStep = (280 - 20) / 6;
+                              
+                              // Create line points path
+                              const points = item.forecast.map((val, idx) => {
+                                const x = 20 + idx * xStep;
+                                // Scale value (0 to 25) to chart height (100px down to 20px)
+                                const y = 100 - (val / 25.0) * 80;
+                                return `${x},${y}`;
+                              }).join(' ');
+
+                              return (
+                                <polyline
+                                  key={itemIdx}
+                                  fill="none"
+                                  stroke={color}
+                                  strokeWidth="2"
+                                  points={points}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="transition-all duration-1000"
+                                />
+                              );
+                            })}
+
+                            {/* X-axis labels */}
+                            <text x="20" y="115" fill="#71717a" fontSize="7" textAnchor="middle">Day 1</text>
+                            <text x="106" y="115" fill="#71717a" fontSize="7" textAnchor="middle">Day 3</text>
+                            <text x="193" y="115" fill="#71717a" fontSize="7" textAnchor="middle">Day 5</text>
+                            <text x="280" y="115" fill="#71717a" fontSize="7" textAnchor="middle">Day 7</text>
+                          </svg>
+                        </div>
                       </div>
                     </div>
                   )}

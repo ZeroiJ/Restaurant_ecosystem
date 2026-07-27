@@ -128,7 +128,7 @@ export async function POST(request) {
         name,
         role,
         isVerified: false,
-        mockOtpCode: sentRealEmail ? null : generatedOtp // Send code back for simple local browser UI testing
+        mockOtpCode: sentRealEmail ? null : generatedOtp // Show code on screen if email failed/not-set (fallback for local dev)
       });
     }
 

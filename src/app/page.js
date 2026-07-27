@@ -64,6 +64,8 @@ export default function Home() {
         setShowOtpModal(true);
         if (data.mockOtpCode) {
           setOtpNotice(`Demo OTP Code: ${data.mockOtpCode} (Printed in Server Console too)`);
+        } else {
+          setOtpNotice('A 4-digit verification code has been sent to your email.');
         }
       } else {
         // If logging in, check if user is verified
@@ -121,9 +123,9 @@ export default function Home() {
       setVerifiedUser(data);
       setShowOtpModal(false);
       
-      // If customer, prompt table reservation before entering portal
+      // If customer, redirect to Reservation page
       if (data.role === 'CUSTOMER') {
-        setShowReservationModal(true);
+        router.push('/reservation');
       } else {
         localStorage.setItem('user', JSON.stringify(data));
         router.push('/kitchen-staff');
@@ -183,8 +185,7 @@ export default function Home() {
         router.push('/customer');
       } else {
         // No reservation found, prompt booking first
-        setVerifiedUser(user);
-        setShowReservationModal(true);
+        router.push('/reservation');
       }
     } catch (err) {
       // Fallback
@@ -407,7 +408,8 @@ export default function Home() {
             <div className="mt-5 p-3 rounded-xl bg-zinc-950/60 border border-zinc-800/40 text-[10px] text-zinc-500 leading-normal">
               <span className="font-bold text-zinc-400 block mb-1">Demo Credentials:</span>
               * Manager: <code className="text-rose-400">manager@vibedine.com</code> / <code className="text-rose-400">password123</code><br/>
-              * Kitchen/Staff: <code className="text-amber-400">staff@vibedine.com</code> / <code className="text-amber-400">password123</code>
+              * Staff: <code className="text-amber-400">staff@vibedine.com</code> / <code className="text-amber-400">password123</code><br/>
+              * Kitchen: <code className="text-cyan-400">kitchen@vibedine.com</code> / <code className="text-cyan-400">password123</code>
             </div>
           </div>
         </div>
