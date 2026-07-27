@@ -1,6 +1,6 @@
 # VibeDine — Smart Restaurant Management System
 
-> Hackathon Project — Real-time restaurant ecosystem with AI-powered manager insights.
+> Team Skill Issue — Hackathon Project — Real-time restaurant ecosystem with AI-powered manager insights.
 
 ## The Problem
 
