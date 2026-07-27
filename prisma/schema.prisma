@@ -1,0 +1,64 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  CUSTOMER
+  STAFF
+  KITCHEN
+  MANAGER
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  password      String   // hashed password
+  role          Role     @default(CUSTOMER)
+  loyaltyPoints Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model MenuItem {
+  id              String   @id @default(uuid())
+  name            String
+  category        String
+  price           Float
+  isAvailable     Boolean  @default(true)
+  popularityScore Float    @default(0.0)
+}
+
+enum OrderStatus {
+  PENDING
+  PREPARING
+  SERVED
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  tableNo     String
+  status      OrderStatus @default(PENDING)
+  customerId  String?
+  items       Json        // JSON array of item details [{id, name, price, quantity}]
+  totalAmount Float
+  createdAt   DateTime    @default(now())
+}
+
+model StaffLog {
+  id                  String   @id @default(uuid())
+  staffUid            String
+  actionType          String   // e.g. "order_delivery", "table_call_response"
+  responseTimeSeconds Float
+  timestamp           DateTime @default(now())
+}
+
+model InventoryItem {
+  id                    String  @id @default(uuid())
+  itemName              String  @unique
+  quantity              Int
+  minThresholdWarning   Int
+}
