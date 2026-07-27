@@ -17,10 +17,24 @@ enum Role {
 model User {
   id            String   @id @default(uuid())
   email         String   @unique
+  name          String?
   password      String   // hashed password
   role          Role     @default(CUSTOMER)
   loyaltyPoints Int      @default(0)
+  isVerified    Boolean  @default(false)
+  otpCode       String?
   createdAt     DateTime @default(now())
+  reservations  Reservation[]
+}
+
+model Reservation {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  tableNo     String
+  dateTime    DateTime
+  status      String   @default("CONFIRMED") // CONFIRMED, ACTIVE, COMPLETED
+  createdAt   DateTime @default(now())
 }
 
 model MenuItem {
@@ -35,7 +49,9 @@ model MenuItem {
 enum OrderStatus {
   PENDING
   PREPARING
+  READY_TO_SERVE
   SERVED
+  PAID
 }
 
 model Order {

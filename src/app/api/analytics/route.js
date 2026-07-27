@@ -26,6 +26,27 @@ export async function GET(request) {
       ? prepLogs.reduce((sum, l) => sum + l.responseTimeSeconds, 0) / prepLogs.length
       : 720; // 12 mins default fallback
 
+    // Calculate waiter performance leaderboard
+    const waiterStats = {};
+    prepLogs.forEach(log => {
+      const uid = log.staffUid || 'ANONYMOUS_WAITER';
+      if (!waiterStats[uid]) {
+        waiterStats[uid] = {
+          staffUid: uid,
+          ordersServed: 0,
+          totalDeliveryTime: 0
+        };
+      }
+      waiterStats[uid].ordersServed += 1;
+      waiterStats[uid].totalDeliveryTime += log.responseTimeSeconds;
+    });
+
+    const waiterLeaderboard = Object.values(waiterStats).map(w => ({
+      staffUid: w.staffUid,
+      ordersServed: w.ordersServed,
+      avgDeliveryTimeSeconds: Math.round(w.totalDeliveryTime / w.ordersServed)
+    })).sort((a, b) => a.avgDeliveryTimeSeconds - b.avgDeliveryTimeSeconds); // fastest first
+
     // 4. Run AI Insights if requested
     let aiInsights = null;
     if (triggerAI) {
@@ -56,6 +77,7 @@ export async function GET(request) {
       },
       inventory,
       lowStockItems,
+      waiterLeaderboard,
       aiInsights
     });
   } catch (error) {

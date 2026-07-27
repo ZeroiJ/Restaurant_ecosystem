@@ -24,9 +24,9 @@ app.prepare().then(() => {
   });
 
   // Active floor staff status cache
-  // Map containing staffUid -> { socketId, status: 'Online' | 'Offline' }
+  // Map containing staffUid -> { socketId, role: 'STAFF' | 'KITCHEN', status: 'Online' | 'Offline' }
   const activeStaff = new Map();
-  // Table calls/pings: Map containing tableNo -> { type: 'Call Staff' | 'Pay Cash', timestamp }
+  // Table calls/pings: Map containing tableNo -> { type: 'Call Waiter' | 'Pay Cash', timestamp }
   const activeAlerts = new Map();
   // Active kitchen orders in prep (live memory buffer for fast push)
   const activeOrders = new Map();
@@ -39,7 +39,7 @@ app.prepare().then(() => {
       socket.join(roomName);
       console.log(`Socket ${socket.id} joined room: ${roomName}`);
       
-      // If joining kitchen-staff dashboard, emit current active lists
+      // If joining staff dashboard, emit current active lists
       if (roomName === 'kitchen-staff-dashboard') {
         socket.emit('staff-status-updated', Array.from(activeStaff.entries()));
         socket.emit('table-alerts-updated', Array.from(activeAlerts.entries()));
@@ -47,9 +47,9 @@ app.prepare().then(() => {
       }
     });
 
-    // Staff online/offline status updates
-    socket.on('staff-register', ({ staffUid, status }) => {
-      activeStaff.set(staffUid, { socketId: socket.id, status });
+    // Staff registration with specific roles (KITCHEN vs WAITER/STAFF)
+    socket.on('staff-register', ({ staffUid, role, status }) => {
+      activeStaff.set(staffUid, { socketId: socket.id, role: role || 'STAFF', status });
       io.to('kitchen-staff-dashboard').emit('staff-status-updated', Array.from(activeStaff.entries()));
     });
 
@@ -64,14 +64,19 @@ app.prepare().then(() => {
     socket.on('place-order', (order) => {
       console.log('New order received:', order);
       activeOrders.set(order.id, order);
-      // Broadcast to kitchen-staff-dashboard
+      // Broadcast to kitchen-staff-dashboard (both chefs & waiters see incoming tickets)
       io.to('kitchen-staff-dashboard').emit('new-order', order);
     });
 
-    // Kitchen progresses order status
+    // Kitchen or Waiter progresses order status
     socket.on('update-order-status', ({ orderId, status }) => {
-      console.log(`Order ${orderId} updated to ${status}`);
-      if (activeOrders.has(orderId)) {
+      console.log(`Order ${orderId} updated to status: ${status}`);
+      
+      if (status === 'PAID') {
+        // 1. Evict order from active cache immediately when paid
+        activeOrders.delete(orderId);
+        console.log(`Order ${orderId} billing completed. Evicted from active cache.`);
+      } else if (activeOrders.has(orderId)) {
         const order = activeOrders.get(orderId);
         order.status = status;
         activeOrders.set(orderId, order);
@@ -79,8 +84,18 @@ app.prepare().then(() => {
       
       // Notify customer (in room customer-order-${orderId})
       io.to(`customer-order-${orderId}`).emit('order-status-changed', { orderId, status });
-      // Notify kitchen-staff dashboards as well
+      
+      // Notify kitchen-staff dashboard
       io.to('kitchen-staff-dashboard').emit('order-status-changed', { orderId, status });
+      
+      // If status is READY_TO_SERVE, send alert specifically to waiters
+      if (status === 'READY_TO_SERVE') {
+        const orderDetails = activeOrders.get(orderId);
+        io.to('kitchen-staff-dashboard').emit('dish-ready-pickup', { 
+          orderId, 
+          tableNo: orderDetails ? orderDetails.tableNo : 'N/A' 
+        });
+      }
     });
 
     // Customer pings staff or requests checkout
@@ -106,6 +121,21 @@ app.prepare().then(() => {
       }
     });
   });
+
+  // Background Cleanup Job: Runs every 5 minutes and purges orders older than 30 minutes
+  setInterval(() => {
+    console.log('[System Server Cache] Running background order cleanup sweep...');
+    const now = Date.now();
+    const maxAgeMs = 30 * 60 * 1000; // 30 minutes
+    
+    for (const [orderId, order] of activeOrders.entries()) {
+      const orderTime = new Date(order.createdAt).getTime();
+      if (now - orderTime > maxAgeMs) {
+        activeOrders.delete(orderId);
+        console.log(`[Cache Purge] Evicted stale/timed-out order ${orderId} from memory.`);
+      }
+    }
+  }, 5 * 60 * 1000);
 
   httpServer.listen(port, (err) => {
     if (err) throw err;

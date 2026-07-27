@@ -16,7 +16,7 @@ function CustomerContent() {
 
   const [user, setUser] = useState(null);
   const [tableNo, setTableNo] = useState('');
-  const [showTableModal, setShowTableModal] = useState(true);
+  const [showTableModal, setShowTableModal] = useState(false);
 
   // Menu items list
   const [menuItems, setMenuItems] = useState([]);
@@ -28,8 +28,11 @@ function CustomerContent() {
   
   // Active order state
   const [activeOrder, setActiveOrder] = useState(null);
-  const [orderStatus, setOrderStatus] = useState(''); // 'PENDING', 'PREPARING', 'SERVED'
+  const [orderStatus, setOrderStatus] = useState(''); // 'PENDING', 'PREPARING', 'READY_TO_SERVE', 'SERVED', 'PAID'
   const [tableAlertStatus, setTableAlertStatus] = useState(null); // 'Call Staff' or 'Pay Cash'
+  
+  // Recommendation system states
+  const [pastOrders, setPastOrders] = useState([]);
   
   // Custom toast notifications for socket events
   const [toasts, setToasts] = useState([]);
@@ -42,17 +45,52 @@ function CustomerContent() {
     }, 4000);
   };
 
-  // Load user session
+  // Load user session, reservations and past orders
   useEffect(() => {
     if (!isGuest) {
       const stored = localStorage.getItem('user');
       if (stored) {
-        setUser(JSON.parse(stored));
+        const currentUser = JSON.parse(stored);
+        setUser(currentUser);
+        
+        // Fetch active reservation to auto-populate Table number
+        const fetchReservation = async () => {
+          try {
+            const res = await fetch(`/api/reservations?userId=${currentUser.id}`);
+            const data = await res.json();
+            if (res.ok && data && data.tableNo) {
+              setTableNo(data.tableNo);
+              setShowTableModal(false); // Bypasses selection modal
+              addToast(`Assigned to Reserved Table ${data.tableNo}!`, 'success');
+            } else {
+              setShowTableModal(true);
+            }
+          } catch (err) {
+            setShowTableModal(true);
+          }
+        };
+        fetchReservation();
+
+        // Fetch past orders for recommendation scoring
+        const fetchPastOrders = async () => {
+          try {
+            const res = await fetch(`/api/orders?customerId=${currentUser.id}`);
+            const ordersData = await res.json();
+            if (res.ok) {
+              setPastOrders(ordersData);
+            }
+          } catch (err) {
+            console.error('Failed to load user order logs:', err);
+          }
+        };
+        fetchPastOrders();
+        
       } else {
         router.push('/');
       }
     } else {
-      setUser({ email: 'Guest Diner', role: 'CUSTOMER', loyaltyPoints: 0 });
+      setUser({ name: 'Guest Diner', email: 'guest@vibedine.com', role: 'CUSTOMER', loyaltyPoints: 0 });
+      setShowTableModal(true);
     }
   }, [isGuest, router]);
 
@@ -83,9 +121,15 @@ function CustomerContent() {
     const handleStatusChange = ({ orderId, status }) => {
       if (orderId === activeOrder.id) {
         setOrderStatus(status);
-        addToast(`Your order is now: ${status}!`, 'success');
+        addToast(`Your order status is now: ${status}!`, 'success');
         if (status === 'SERVED') {
           setActiveOrder((prev) => ({ ...prev, status: 'SERVED' }));
+        }
+        if (status === 'PAID') {
+          setActiveOrder(null);
+          setOrderStatus('');
+          setTableAlertStatus(null);
+          addToast('Order billing completed. Visit us again!', 'success');
         }
       }
     };
@@ -107,7 +151,7 @@ function CustomerContent() {
       }
       return [...prev, { ...item, quantity: 1 }];
     });
-    addToast(`${item.name} added to cart.`, 'success');
+    addToast(`${item.name} added to basket.`, 'success');
   };
 
   const updateQuantity = (itemId, change) => {
@@ -164,10 +208,10 @@ function CustomerContent() {
 
   const handleCallStaff = () => {
     if (!socket || !tableNo) return;
-    const type = tableAlertStatus === 'Call Staff' ? 'Clear' : 'Call Staff';
+    const type = tableAlertStatus === 'Call Waiter' ? 'Clear' : 'Call Waiter';
     socket.emit('table-alert', { tableNo, type });
-    setTableAlertStatus(type === 'Clear' ? null : 'Call Staff');
-    addToast(type === 'Clear' ? 'Staff ping cancelled.' : 'Staff called to Table ' + tableNo, 'success');
+    setTableAlertStatus(type === 'Clear' ? null : 'Call Waiter');
+    addToast(type === 'Clear' ? 'Staff ping cancelled.' : 'Waiter called to Table ' + tableNo, 'success');
   };
 
   const handlePayCash = () => {
@@ -175,7 +219,7 @@ function CustomerContent() {
     const type = tableAlertStatus === 'Pay Cash' ? 'Clear' : 'Pay Cash';
     socket.emit('table-alert', { tableNo, type });
     setTableAlertStatus(type === 'Clear' ? null : 'Pay Cash');
-    addToast(type === 'Clear' ? 'Cash payment flag cleared.' : 'Requested Cash settlement for Table ' + tableNo, 'success');
+    addToast(type === 'Clear' ? 'Cash settlement flag cleared.' : 'Requested Cash settlement for Table ' + tableNo, 'success');
   };
 
   const handleLogout = () => {
@@ -183,17 +227,72 @@ function CustomerContent() {
     router.push('/');
   };
 
-  // Group menu recommendations vs others for logged-in users
-  const sortedMenuItems = [...menuItems].sort((a, b) => {
-    // Show availability first
-    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
-    // Recommendations boost based on category match (simulate historic search)
-    if (!isGuest && user) {
-      // Simulate historical preference for "Mains" category
-      const prefA = a.category === 'Mains' ? 1 : 0;
-      const prefB = b.category === 'Mains' ? 1 : 0;
-      if (prefA !== prefB) return prefB - prefA;
+  // ----------------------------------------------------
+  // Dynamic Personalization Recommendation Scoring Engine
+  // ----------------------------------------------------
+  const recommendedItems = React.useMemo(() => {
+    if (menuItems.length === 0) return [];
+    
+    // For Guests or new users without orders, recommend top popularity score items
+    if (isGuest || pastOrders.length === 0) {
+      return [...menuItems]
+        .filter(item => item.isAvailable)
+        .sort((a, b) => b.popularityScore - a.popularityScore)
+        .slice(0, 3);
     }
+    
+    // Calculate category and item frequency
+    const categoryCounts = {};
+    const itemCounts = {};
+    
+    pastOrders.forEach(order => {
+      const itemsList = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
+      itemsList.forEach(item => {
+        const menuItem = menuItems.find(m => m.name === item.name || m.id === item.id);
+        if (menuItem) {
+          categoryCounts[menuItem.category] = (categoryCounts[menuItem.category] || 0) + item.quantity;
+        }
+        itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+      });
+    });
+    
+    // Sort favorite categories and items desc
+    const favoriteCategories = Object.entries(categoryCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+      
+    const favoriteItems = Object.entries(itemCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(entry => entry[0]);
+
+    // Rank available menu items dynamically
+    return [...menuItems]
+      .filter(item => item.isAvailable)
+      .map(item => {
+        let rankScore = item.popularityScore;
+        
+        // Exact past item boost
+        if (favoriteItems.includes(item.name)) {
+          const index = favoriteItems.indexOf(item.name);
+          rankScore += (10 - index) * 3;
+        }
+        
+        // Category affinity boost
+        if (favoriteCategories.includes(item.category)) {
+          const index = favoriteCategories.indexOf(item.category);
+          rankScore += (5 - index) * 1.5;
+        }
+        
+        return { item, rankScore };
+      })
+      .sort((a, b) => b.rankScore - a.rankScore)
+      .map(entry => entry.item)
+      .slice(0, 3);
+  }, [menuItems, pastOrders, isGuest]);
+
+  // Group menu list for active category display
+  const sortedMenuItems = [...menuItems].sort((a, b) => {
+    if (a.isAvailable !== b.isAvailable) return a.isAvailable ? -1 : 1;
     return b.popularityScore - a.popularityScore;
   });
 
@@ -262,7 +361,7 @@ function CustomerContent() {
       {/* Main Body */}
       <main className="max-w-6xl mx-auto px-6 py-8 flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8 w-full">
         
-        {/* Left/Middle: Menu list */}
+        {/* Left/Middle: Recommendations & Menu list */}
         <div className="lg:col-span-2 space-y-8">
           
           {/* Active order tracker (if exists) */}
@@ -275,19 +374,28 @@ function CustomerContent() {
               
               <div className="flex items-center justify-between gap-2 max-w-md mb-6">
                 <div className="flex flex-col items-center flex-1">
-                  <div className={`p-2.5 rounded-xl flex items-center justify-center ${orderStatus === 'PENDING' || orderStatus === 'PREPARING' || orderStatus === 'SERVED' ? 'bg-rose-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
+                  <div className={`p-2.5 rounded-xl flex items-center justify-center ${orderStatus === 'PENDING' || orderStatus === 'PREPARING' || orderStatus === 'READY_TO_SERVE' || orderStatus === 'SERVED' ? 'bg-rose-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
                     <Utensils className="h-4 w-4" />
                   </div>
                   <span className="text-[10px] mt-2 font-semibold text-zinc-300">Pending</span>
                 </div>
                 <div className="h-0.5 bg-zinc-800 flex-1 relative">
-                  <div className={`absolute top-0 left-0 h-full bg-rose-500 transition-all duration-1000 ${orderStatus === 'PREPARING' || orderStatus === 'SERVED' ? 'w-full' : 'w-0'}`} />
+                  <div className={`absolute top-0 left-0 h-full bg-rose-500 transition-all duration-1000 ${orderStatus === 'PREPARING' || orderStatus === 'READY_TO_SERVE' || orderStatus === 'SERVED' ? 'w-full' : 'w-0'}`} />
                 </div>
                 <div className="flex flex-col items-center flex-1">
-                  <div className={`p-2.5 rounded-xl flex items-center justify-center ${orderStatus === 'PREPARING' || orderStatus === 'SERVED' ? 'bg-rose-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
+                  <div className={`p-2.5 rounded-xl flex items-center justify-center ${orderStatus === 'PREPARING' || orderStatus === 'READY_TO_SERVE' || orderStatus === 'SERVED' ? 'bg-rose-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
                     <Sparkles className="h-4 w-4" />
                   </div>
                   <span className="text-[10px] mt-2 font-semibold text-zinc-300">Preparing</span>
+                </div>
+                <div className="h-0.5 bg-zinc-800 flex-1 relative">
+                  <div className={`absolute top-0 left-0 h-full bg-rose-500 transition-all duration-1000 ${orderStatus === 'READY_TO_SERVE' || orderStatus === 'SERVED' ? 'w-full' : 'w-0'}`} />
+                </div>
+                <div className="flex flex-col items-center flex-1">
+                  <div className={`p-2.5 rounded-xl flex items-center justify-center ${orderStatus === 'READY_TO_SERVE' || orderStatus === 'SERVED' ? 'bg-rose-500 text-white' : 'bg-zinc-900 text-zinc-600'}`}>
+                    <Bell className="h-4 w-4" />
+                  </div>
+                  <span className="text-[10px] mt-2 font-semibold text-zinc-300">Ready</span>
                 </div>
                 <div className="h-0.5 bg-zinc-800 flex-1 relative">
                   <div className={`absolute top-0 left-0 h-full bg-rose-500 transition-all duration-1000 ${orderStatus === 'SERVED' ? 'w-full' : 'w-0'}`} />
@@ -300,6 +408,12 @@ function CustomerContent() {
                 </div>
               </div>
 
+              {orderStatus === 'READY_TO_SERVE' && (
+                <div className="bg-amber-500/10 border border-amber-500/20 p-3.5 rounded-xl mb-4 text-xs text-amber-400 font-semibold flex items-center gap-2 animate-bounce">
+                  <Sparkles className="h-4 w-4 animate-spin text-amber-400" /> Waiter has been pinged to serve your fresh dish!
+                </div>
+              )}
+
               {orderStatus === 'SERVED' ? (
                 <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div>
@@ -310,9 +424,9 @@ function CustomerContent() {
                   <div className="flex items-center gap-3.5">
                     <button
                       onClick={handleCallStaff}
-                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${tableAlertStatus === 'Call Staff' ? 'bg-rose-500 text-white shadow-lg shadow-rose-950/40' : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900'}`}
+                      className={`px-4 py-2 text-xs font-bold rounded-xl transition-all duration-300 cursor-pointer ${tableAlertStatus === 'Call Waiter' ? 'bg-rose-500 text-white shadow-lg shadow-rose-950/40' : 'border border-zinc-800 text-zinc-300 hover:bg-zinc-900'}`}
                     >
-                      {tableAlertStatus === 'Call Staff' ? 'Staff Pinged' : 'Call Staff'}
+                      {tableAlertStatus === 'Call Waiter' ? 'Staff Pinged' : 'Call Waiter'}
                     </button>
                     <button
                       onClick={handlePayCash}
@@ -330,9 +444,42 @@ function CustomerContent() {
                 </div>
               ) : (
                 <p className="text-zinc-400 text-xs font-light leading-relaxed">
-                  Our culinary team is handcrafting your selections. Live socket pipeline active.
+                  Our culinary team is preparing your selection. Live status synchronization active.
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Dynamic Personalized Recommendations Shelf */}
+          {recommendedItems.length > 0 && (
+            <div className="rounded-3xl border border-rose-500/10 bg-gradient-to-r from-rose-950/5 to-zinc-900/30 p-6 backdrop-blur-md">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-rose-400 mb-4 flex items-center gap-1.5 font-outfit">
+                <Sparkles className="h-4 w-4 text-rose-500 animate-pulse" />
+                {isGuest ? "Chef's Handpicked Indian Specials" : `Suited For You, ${user?.name || 'Diner'}`}
+              </h3>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {recommendedItems.map(item => (
+                  <div 
+                    key={`rec-${item.id}`} 
+                    className="p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/60 hover:border-rose-500/20 hover:bg-zinc-900/80 transition-all duration-300 flex flex-col justify-between text-left"
+                  >
+                    <div>
+                      <span className="text-[10px] text-rose-400 font-bold uppercase tracking-wider block mb-1">{item.category}</span>
+                      <h4 className="text-sm font-bold text-zinc-100 font-outfit leading-tight mb-2 line-clamp-1">{item.name}</h4>
+                    </div>
+                    <div className="flex justify-between items-center mt-3">
+                      <span className="text-sm font-bold text-zinc-200 font-outfit">${item.price.toFixed(2)}</span>
+                      <button
+                        onClick={() => addToCart(item)}
+                        className="p-1.5 bg-rose-500 hover:bg-rose-600 rounded-lg text-white transition-all duration-300"
+                      >
+                        <ShoppingBag className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -368,7 +515,7 @@ function CustomerContent() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {filteredMenuItems.map((item) => {
-                  const isPersonalized = !isGuest && item.category === 'Mains'; // Simple mock personalization indicator
+                  const isPersonalized = recommendedItems.some(rec => rec.id === item.id);
                   return (
                     <div
                       key={item.id}
@@ -377,8 +524,8 @@ function CustomerContent() {
                       }`}
                     >
                       {isPersonalized && item.isAvailable && (
-                        <div className="absolute top-4 right-4 flex items-center gap-1 text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">
-                          <Sparkles className="h-3 w-3" /> Preferred
+                        <div className="absolute top-4 right-4 flex items-center gap-1 text-[10px] bg-rose-500/10 border border-rose-500/20 text-rose-400 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider animate-pulse">
+                          <Sparkles className="h-3 w-3" /> Recommended
                         </div>
                       )}
 
@@ -386,7 +533,7 @@ function CustomerContent() {
                         <span className="text-zinc-500 text-xs font-medium uppercase tracking-wider">{item.category}</span>
                         <h4 className="text-lg font-bold text-zinc-100 mt-1 mb-2 font-outfit">{item.name}</h4>
                         <p className="text-zinc-400 text-xs font-light leading-relaxed mb-6">
-                          Fresh premium ingredients crafted dynamically to order. Popularity score: {item.popularityScore.toFixed(1)}/10.
+                          Authentic Indian recipe made with fresh ingredients. Popularity: {item.popularityScore.toFixed(1)}/10.
                         </p>
                       </div>
 
@@ -465,7 +612,7 @@ function CustomerContent() {
                     <span className="text-zinc-300 font-medium">${cartTotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Tax & Fees (5%)</span>
+                    <span className="text-zinc-400">CGST & SGST (5%)</span>
                     <span className="text-zinc-300 font-medium">${(cartTotal * 0.05).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between text-base font-bold pt-2 border-t border-zinc-900">
@@ -494,7 +641,6 @@ function CustomerContent() {
               </h4>
               
               <div className="mx-auto w-[180px] h-[180px] bg-white rounded-2xl p-4 flex flex-col justify-center items-center relative overflow-hidden shadow-inner mb-4">
-                {/* Simulated QR blocks */}
                 <div className="grid grid-cols-5 gap-1.5 w-full h-full opacity-90">
                   {Array.from({ length: 25 }).map((_, idx) => {
                     const isFilled = (idx * 17) % 3 === 0 || (idx > 4 && idx < 10) || idx % 7 === 0;
@@ -514,15 +660,33 @@ function CustomerContent() {
               </div>
 
               <code className="text-[10px] text-zinc-500 break-all select-all font-mono block mb-4 bg-zinc-950 p-2 rounded-lg border border-zinc-900">
-                {`upi://pay?pa=vibedine@hdfc&pn=VibeDine&am=${(activeOrder.totalAmount * 1.05).toFixed(2)}&cu=USD`}
+                {`upi://pay?pa=vibedine@hdfcbank&pn=VibeDine&am=${(activeOrder.totalAmount * 1.05).toFixed(2)}&cu=INR`}
               </code>
 
               <button
-                onClick={() => {
-                  setOrderStatus('PAID');
-                  setActiveOrder(null);
-                  setTableAlertStatus(null);
-                  addToast('Payment Received. Enjoy your day!', 'success');
+                onClick={async () => {
+                  try {
+                    // Update order in database to PAID
+                    const res = await fetch('/api/orders', {
+                      method: 'PUT',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ id: activeOrder.id, status: 'PAID' })
+                    });
+                    
+                    if (res.ok) {
+                      // Broadcast PAID status update via WebSockets to KDS & Waiter
+                      if (socket) {
+                        socket.emit('update-order-status', { orderId: activeOrder.id, status: 'PAID' });
+                      }
+                      
+                      setOrderStatus('PAID');
+                      setActiveOrder(null);
+                      setTableAlertStatus(null);
+                      addToast('Payment Confirmed! Database & Cache updated.', 'success');
+                    }
+                  } catch (err) {
+                    addToast('Payment sync failed.', 'error');
+                  }
                 }}
                 className="w-full py-2.5 rounded-xl border border-zinc-800 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-zinc-300 hover:text-emerald-400 text-xs font-bold transition-all duration-300 cursor-pointer"
               >
@@ -533,7 +697,7 @@ function CustomerContent() {
         </div>
       </main>
 
-      {/* Table number Selection modal */}
+      {/* Table number Selection modal (ONLY for Guests) */}
       {showTableModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-300">
