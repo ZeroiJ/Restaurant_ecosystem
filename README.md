@@ -60,4 +60,8 @@ npm run dev
 
 ## Team
 
-Built for [Hackathon Name] by [Team Name].
+| Name | Role |
+|---|---|
+| **Sujal Birwadkar** (Lead) | CI/CD deployment, Databases |
+| **Mohit Malpote** | Full-stack development — built the entire app |
+| **Riya Phalke** | Research, PPT, documentation |
