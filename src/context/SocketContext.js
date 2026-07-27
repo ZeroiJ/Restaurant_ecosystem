@@ -27,7 +27,9 @@ export const SocketProvider = ({ children }) => {
       console.log('Socket disconnected client-side');
     });
 
-    setSocket(socketInstance);
+    setTimeout(() => {
+      setSocket(socketInstance);
+    }, 0);
 
     return () => {
       socketInstance.disconnect();

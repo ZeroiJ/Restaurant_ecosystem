@@ -80,7 +80,9 @@ export default function ManagerDashboard() {
       router.push('/');
     }
 
-    fetchDashboardData();
+    setTimeout(() => {
+      fetchDashboardData();
+    }, 0);
   }, [router]);
 
   // Hook into Socket room for staff status
@@ -572,7 +574,7 @@ export default function ManagerDashboard() {
                     <div className="py-8 text-center">
                       <Cpu className="h-8 w-8 text-zinc-800 mx-auto mb-3" />
                       <p className="text-xs text-zinc-550 leading-relaxed font-light mb-4">
-                        Perform an operations prediction query in the "Inventory" tab to pull smart business advice.
+                        Perform an operations prediction query in the &quot;Inventory&quot; tab to pull smart business advice.
                       </p>
                       <button
                         onClick={() => fetchDashboardData(true)}

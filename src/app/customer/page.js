@@ -57,7 +57,9 @@ function CustomerContent() {
       const stored = localStorage.getItem('user');
       if (stored) {
         const currentUser = JSON.parse(stored);
-        setUser(currentUser);
+        setTimeout(() => {
+          setUser(currentUser);
+        }, 0);
         
         // Fetch active reservation to auto-populate Table number
         const fetchReservation = async () => {
@@ -95,8 +97,10 @@ function CustomerContent() {
         router.push('/');
       }
     } else {
-      setUser({ name: 'Guest Diner', email: 'guest@vibedine.com', role: 'CUSTOMER', loyaltyPoints: 0 });
-      setShowTableModal(true);
+      setTimeout(() => {
+        setUser({ name: 'Guest Diner', email: 'guest@vibedine.com', role: 'CUSTOMER', loyaltyPoints: 0 });
+        setShowTableModal(true);
+      }, 0);
     }
   }, [isGuest, router]);
 
@@ -735,7 +739,7 @@ function CustomerContent() {
       {showSentiment && showFeedback && !sentimentDone && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="w-full max-w-sm bg-zinc-900 border border-zinc-800 rounded-3xl p-8 text-center shadow-2xl animate-in fade-in zoom-in-95 duration-300">
-            <h3 className="text-xl font-bold font-outfit text-zinc-100 mb-2">We're sorry</h3>
+            <h3 className="text-xl font-bold font-outfit text-zinc-100 mb-2">We&apos;re sorry</h3>
             <p className="text-zinc-400 text-xs mb-4">Tell us what went wrong (private)</p>
             <textarea
               value={sentimentFeedback}

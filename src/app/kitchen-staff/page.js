@@ -9,6 +9,11 @@ import {
 } from 'lucide-react';
 import PipelineVisualization from '@/app/components/PipelineVisualization';
 
+// Helper to keep component pure during rendering while allowing timestamp calculations
+const calculateElapsedSeconds = (createdAt) => {
+  return Math.floor((Date.now() - new Date(createdAt).getTime()) / 1000);
+};
+
 export default function KitchenStaffUnified() {
   const router = useRouter();
   const { socket, connected } = useSocket();
@@ -26,6 +31,22 @@ export default function KitchenStaffUnified() {
   
   // Stats
   const [averageDeliveryTime, setAverageDeliveryTime] = useState(0);
+
+  // For relative time calculations to keep render functions pure
+  const [now, setNow] = useState(null);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setNow(Date.now());
+    }, 0);
+    const timer = setInterval(() => {
+      setNow(Date.now());
+    }, 1000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+    };
+  }, []);
 
   // Sound ref for high-priority chime
   const audioContextRef = useRef(null);
@@ -64,9 +85,11 @@ export default function KitchenStaffUnified() {
       if (user.role !== 'STAFF' && user.role !== 'KITCHEN') {
         router.push('/');
       } else {
-        setCurrentUser(user);
-        setStaffUid(user.name || user.email);
-        setIsRegistered(true);
+        setTimeout(() => {
+          setCurrentUser(user);
+          setStaffUid(user.name || user.email);
+          setIsRegistered(true);
+        }, 0);
       }
     } else {
       router.push('/');
@@ -178,7 +201,7 @@ export default function KitchenStaffUnified() {
     if (nextStatus === 'SERVED') {
       const order = orders.find(o => o.id === orderId);
       if (order) {
-        const elapsedSecs = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 1000);
+        const elapsedSecs = calculateElapsedSeconds(order.createdAt);
         
         try {
           const logPayload = {
@@ -350,7 +373,7 @@ export default function KitchenStaffUnified() {
 
                       <div className="flex justify-between items-center mt-2.5">
                         <span className="text-[10px] text-zinc-500">
-                          Piped {Math.floor((Date.now() - item.timestamp) / 1000)}s ago
+                          Piped {now ? Math.floor((now - item.timestamp) / 1000) : 0}s ago
                         </span>
                         <button
                           onClick={() => handleClearAlert(tableNo)}
@@ -453,7 +476,7 @@ export default function KitchenStaffUnified() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {kitchenTickets.map((order) => {
                     const itemsList = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
-                    const elapsedSecs = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 1000);
+                    const elapsedSecs = now ? Math.floor((now - new Date(order.createdAt).getTime()) / 1000) : 0;
                     
                     return (
                       <div
@@ -541,7 +564,7 @@ export default function KitchenStaffUnified() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {readyTickets.map((order) => {
                     const itemsList = Array.isArray(order.items) ? order.items : JSON.parse(order.items || '[]');
-                    const elapsedSecs = Math.floor((Date.now() - new Date(order.createdAt).getTime()) / 1000);
+                    const elapsedSecs = now ? Math.floor((now - new Date(order.createdAt).getTime()) / 1000) : 0;
                     
                     return (
                       <div
