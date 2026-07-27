@@ -1,36 +1,88 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
+# VibeDine — Smart Restaurant Management System
 
-## Getting Started
+Real-time restaurant ecosystem with customer reservation, kitchen display, floor staff coordination, manager analytics, and ML forecasting.
 
-First, run the development server:
+Built with **Next.js 16**, **React 19**, **Socket.IO**, **Prisma** (Neon DB), **Redis**, and **Gemini AI**.
+
+## Live Demo
+
+Deployed on Railway: [restaurantecosystem-production.up.railway.app](https://restaurantecosystem-production.up.railway.app)
+
+## Features
+
+- **Customer Portal** — Table reservation, menu browsing, order placement, real-time order tracking
+- **Kitchen Display** — Live incoming orders, prep timer, status progression
+- **Staff Dashboard** — Table alerts (call waiter / pay cash), staff status management
+- **Manager Dashboard** — Revenue metrics, inventory tracking, waiter leaderboard, AI-powered insights
+- **ML Forecasting** — XGBoost-based 7-day demand and ingredient depletion prediction
+- **Reservation Page** — Standalone table booking with date/time picker
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Framework | Next.js 16 (custom server with Socket.IO) |
+| UI | React 19, Tailwind CSS 4, Lucide Icons |
+| Database | PostgreSQL via Prisma (Neon) |
+| Cache | Redis (ioredis) |
+| Real-time | Socket.IO |
+| AI | Gemini 2.5 Flash (Google Gen AI) |
+| ML | XGBoost / scikit-learn (Python script) |
+
+## Local Development
+
+### Prerequisites
+
+- Node.js 20+
+- PostgreSQL (or use the Neon connection string)
+- Redis (optional — falls back to in-memory cache)
+
+### Setup
+
+```bash
+npm install
+npx prisma generate
+```
+
+### Environment Variables
+
+Create a `.env` file in the root:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key
+DATABASE_URL="postgresql://..."
+REDIS_URL="redis://..."
+PORT=3000
+```
+
+### Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Opens at [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
+Login credentials (dev):
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Role | Email | Password |
+|---|---|---|
+| Customer | — | OTP-based signup |
+| Kitchen Staff | kitchen@vibedine.com | password123 |
+| Manager | — | — |
 
-## Learn More
+## Deploy on Railway
 
-To learn more about Next.js, take a look at the following resources:
+1. **Push to GitHub** and link your repo on [Railway Dashboard](https://railway.com/new)
+2. **Set environment variables** in Railway → your service → Variables tab:
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+   | Variable | Value |
+   |---|---|
+   | `GEMINI_API_KEY` | Your Gemini API key |
+   | `DATABASE_URL` | PostgreSQL connection string |
+   | `REDIS_URL` | Redis connection string (optional) |
+   | `PORT` | `3000` |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. No extra config needed — Railway auto-detects Node.js and runs `npm run build` + `npm start`.
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The app uses a custom server (`server.js`) with Socket.IO for real-time features. Railway handles this correctly with the default Node.js builder.
