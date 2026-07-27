@@ -1,88 +1,63 @@
 # VibeDine — Smart Restaurant Management System
 
-Real-time restaurant ecosystem with customer reservation, kitchen display, floor staff coordination, manager analytics, and ML forecasting.
+> Hackathon Project — Real-time restaurant ecosystem with AI-powered manager insights.
 
-Built with **Next.js 16**, **React 19**, **Socket.IO**, **Prisma** (Neon DB), **Redis**, and **Gemini AI**.
+## The Problem
 
-## Live Demo
+Restaurants run on chaos. Kitchen staff can't see orders in real time. Waiters run around blind. Managers guess when to restock. Customers wave their hands for the check.
 
-Deployed on Railway: [restaurantecosystem-production.up.railway.app](https://restaurantecosystem-production.up.railway.app)
+## What We Built
 
-## Features
+A unified real-time platform connecting every role in a restaurant:
 
-- **Customer Portal** — Table reservation, menu browsing, order placement, real-time order tracking
-- **Kitchen Display** — Live incoming orders, prep timer, status progression
-- **Staff Dashboard** — Table alerts (call waiter / pay cash), staff status management
-- **Manager Dashboard** — Revenue metrics, inventory tracking, waiter leaderboard, AI-powered insights
-- **ML Forecasting** — XGBoost-based 7-day demand and ingredient depletion prediction
-- **Reservation Page** — Standalone table booking with date/time picker
+- **Customers** — Reserve tables via OTP, browse menu, place orders, track live status
+- **Kitchen Staff** — See orders pop up in real time, mark prep stages, trigger pickup alerts
+- **Wait Staff** — Receive table calls (waiter / checkout), coordinate deliveries
+- **Manager** — Dashboard with revenue, inventory, staff performance, and **AI-generated operations insights**
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Framework | Next.js 16 (custom server with Socket.IO) |
-| UI | React 19, Tailwind CSS 4, Lucide Icons |
-| Database | PostgreSQL via Prisma (Neon) |
-| Cache | Redis (ioredis) |
-| Real-time | Socket.IO |
-| AI | Gemini 2.5 Flash (Google Gen AI) |
-| ML | XGBoost / scikit-learn (Python script) |
+| Frontend | Backend | Infrastructure |
+|---|---|---|
+| Next.js 16 | Node.js + Socket.IO | Railway (hosted) |
+| React 19 | Prisma + PostgreSQL | Neon (DB) |
+| Tailwind CSS 4 | Redis (ioredis) | Redis Cloud |
+| Lucide Icons | Gemini 2.5 Flash AI | Google AI |
 
-## Local Development
+Also includes an **XGBoost ML forecast script** that predicts 7-day menu demand and ingredient depletion.
 
-### Prerequisites
+## Live Demo
 
-- Node.js 20+
-- PostgreSQL (or use the Neon connection string)
-- Redis (optional — falls back to in-memory cache)
+[restaurantecosystem-production.up.railway.app](https://restaurantecosystem-production.up.railway.app)
 
-### Setup
+## Running Locally
 
 ```bash
 npm install
 npx prisma generate
 ```
 
-### Environment Variables
-
-Create a `.env` file in the root:
+Create `.env`:
 
 ```env
-GEMINI_API_KEY=your_gemini_api_key
-DATABASE_URL="postgresql://..."
-REDIS_URL="redis://..."
+GEMINI_API_KEY=your_key
+DATABASE_URL=postgresql://...
+REDIS_URL=redis://...
 PORT=3000
 ```
-
-### Run
 
 ```bash
 npm run dev
 ```
 
-Opens at [http://localhost:3000](http://localhost:3000).
+## Architecture
 
-Login credentials (dev):
+- **Custom server** (`server.js`) hosts Next.js + Socket.IO on the same port
+- Real-time rooms: `kitchen-staff-dashboard`, `customer-order-{id}`
+- AI analytics endpoint (`/api/analytics`) calls Gemini with structured JSON prompt
+- ML forecasting (`/api/ml-forecast`) pipes inventory data to Python XGBoost script
+- In-memory fallbacks for DB and Redis — works out of the box with no external services
 
-| Role | Email | Password |
-|---|---|---|
-| Customer | — | OTP-based signup |
-| Kitchen Staff | kitchen@vibedine.com | password123 |
-| Manager | — | — |
+## Team
 
-## Deploy on Railway
-
-1. **Push to GitHub** and link your repo on [Railway Dashboard](https://railway.com/new)
-2. **Set environment variables** in Railway → your service → Variables tab:
-
-   | Variable | Value |
-   |---|---|
-   | `GEMINI_API_KEY` | Your Gemini API key |
-   | `DATABASE_URL` | PostgreSQL connection string |
-   | `REDIS_URL` | Redis connection string (optional) |
-   | `PORT` | `3000` |
-
-3. No extra config needed — Railway auto-detects Node.js and runs `npm run build` + `npm start`.
-
-The app uses a custom server (`server.js`) with Socket.IO for real-time features. Railway handles this correctly with the default Node.js builder.
+Built for [Hackathon Name] by [Team Name].
