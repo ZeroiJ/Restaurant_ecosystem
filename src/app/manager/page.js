@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocket } from '@/context/SocketContext';
 import KitchenTimeMachine from '@/app/components/KitchenTimeMachine';
-import AutoPilotToggle from '@/app/components/AutoPilotToggle';
 import {
   Shield, TrendingUp, AlertTriangle, Users, Cpu, FileText, ArrowUpRight,
   TrendingDown, CheckCircle, RefreshCw, BarChart2, Plus, ArrowLeft, LogOut,
@@ -370,9 +369,6 @@ export default function ManagerDashboard() {
           {activeTab === 'operations' && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
-              {/* Auto-Pilot Mode */}
-              <AutoPilotToggle socket={socket} />
-
               {/* Operations KPI metrics bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="rounded-3xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col justify-between">

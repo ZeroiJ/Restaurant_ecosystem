@@ -30,8 +30,7 @@ app.prepare().then(() => {
   const activeAlerts = new Map();
   // Active kitchen orders in prep (live memory buffer for fast push)
   const activeOrders = new Map();
-  let autoPilotEnabled = false;
-  // Kitchen Time Machine: in-memory status change log
+    // Kitchen Time Machine: in-memory status change log
   const statusLog = [];
 
   io.on('connection', (socket) => {
@@ -120,12 +119,6 @@ app.prepare().then(() => {
       io.to('kitchen-staff-dashboard').emit('table-alerts-updated', Array.from(activeAlerts.entries()));
     });
 
-    // Auto-Pilot toggle from manager dashboard
-    socket.on('toggle-auto-pilot', ({ enabled }) => {
-      autoPilotEnabled = enabled;
-      console.log(`[Auto-Pilot] ${enabled ? 'ENABLED' : 'DISABLED'}`);
-    });
-
     socket.on('disconnect', () => {
       console.log('Client disconnected:', socket.id);
       // Clean up disconnected staff
@@ -153,52 +146,6 @@ app.prepare().then(() => {
       }
     }
   }, 5 * 60 * 1000);
-
-  // Auto-Pilot: monitors order saturation every 30s
-  setInterval(async () => {
-    if (!autoPilotEnabled) return;
-
-    const preparingOrders = [];
-    for (const order of activeOrders.values()) {
-      if (order.status === 'PREPARING') {
-        preparingOrders.push(order);
-      }
-    }
-
-    const count = preparingOrders.length;
-    if (count === 0) return;
-
-    // Fetch menu to resolve item IDs to categories
-    let menuItems = [];
-    try {
-      const res = await fetch(`http://localhost:${port}/api/menu`);
-      if (res.ok) menuItems = await res.json();
-    } catch (e) {
-      console.error('[Auto-Pilot] Failed to fetch menu:', e.message);
-      return;
-    }
-
-    const itemCategory = {};
-    for (const item of menuItems) itemCategory[item.id] = item.category;
-
-    const affectedCategories = new Set();
-    for (const order of preparingOrders) {
-      for (const item of order.items) {
-        const cat = itemCategory[item.id];
-        if (cat) affectedCategories.add(cat);
-      }
-    }
-
-    const categories = Array.from(affectedCategories);
-
-    if (count > 4) {
-      console.log(`[Auto-Pilot] PAUSE: ${count} orders, pausing: ${categories.join(', ')}`);
-      io.emit('auto-pilot-action', { action: 'pause', categories, saturation: count });
-    } else if (count <= 2) {
-      console.log(`[Auto-Pilot] RESUME: ${count} orders, resuming: ${categories.join(', ')}`);
-      io.emit('auto-pilot-action', { action: 'resume', categories, saturation: count });
-    }
-  }, 30 * 1000);
 
   httpServer.listen(port, (err) => {
     if (err) throw err;

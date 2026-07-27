@@ -61,13 +61,6 @@
 - Snapshot view computes every order's latest status at the scrub position
 - 4th tab on manager dashboard ("Kitchen Time Machine")
 
-**Auto-Pilot Mode** — `server.js` + `src/app/components/AutoPilotToggle.js` + `src/app/manager/page.js`
-- Toggle on manager dashboard operations tab
-- When ON: 30s server interval monitors PREPARING order saturation
-- Saturation > 4 → pauses menu items in affected categories via `PUT /api/menu`
-- Saturation ≤ 2 → resumes paused items
-- Live status: monitoring / paused / resumed, saturation count, affected categories
-
 **Sentiment-Gated Reviews** — `src/app/customer/page.js`
 - After PAID status, shows a popup with 😊 / 😞
 - 😊 → opens Google Review link in new tab
