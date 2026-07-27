@@ -30,6 +30,8 @@ app.prepare().then(() => {
   const activeAlerts = new Map();
   // Active kitchen orders in prep (live memory buffer for fast push)
   const activeOrders = new Map();
+    // Kitchen Time Machine: in-memory status change log
+  const statusLog = [];
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
@@ -64,6 +66,7 @@ app.prepare().then(() => {
     socket.on('place-order', (order) => {
       console.log('New order received:', order);
       activeOrders.set(order.id, order);
+      statusLog.push({ orderId: order.id, status: 'PENDING', tableNo: order.tableNo, timestamp: Date.now(), items: order.items });
       // Broadcast to kitchen-staff-dashboard (both chefs & waiters see incoming tickets)
       io.to('kitchen-staff-dashboard').emit('new-order', order);
     });
@@ -72,6 +75,9 @@ app.prepare().then(() => {
     socket.on('update-order-status', ({ orderId, status }) => {
       console.log(`Order ${orderId} updated to status: ${status}`);
       
+      const orderDetails = activeOrders.get(orderId);
+      statusLog.push({ orderId, status, tableNo: orderDetails ? orderDetails.tableNo : 'N/A', timestamp: Date.now(), items: orderDetails ? orderDetails.items : [] });
+
       if (status === 'PAID') {
         // 1. Evict order from active cache immediately when paid
         activeOrders.delete(orderId);
@@ -90,12 +96,16 @@ app.prepare().then(() => {
       
       // If status is READY_TO_SERVE, send alert specifically to waiters
       if (status === 'READY_TO_SERVE') {
-        const orderDetails = activeOrders.get(orderId);
         io.to('kitchen-staff-dashboard').emit('dish-ready-pickup', { 
           orderId, 
           tableNo: orderDetails ? orderDetails.tableNo : 'N/A' 
         });
       }
+    });
+
+    // Kitchen Time Machine: return full timeline on request
+    socket.on('get-timeline', () => {
+      socket.emit('timeline-data', statusLog);
     });
 
     // Customer pings staff or requests checkout
