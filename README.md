@@ -15,6 +15,22 @@ A unified real-time platform connecting every role in a restaurant:
 - **Wait Staff** — Receive table calls (waiter / checkout), coordinate deliveries
 - **Manager** — Dashboard with revenue, inventory, staff performance, and **AI-generated operations insights**
 
+## Team
+
+| Name | Role |
+|---|---|
+| **Sujal Birwadkar** (Lead) | CI/CD deployment, Databases |
+| **Mohit Malpote** | Full-stack development — built the entire app |
+| **Riya Phalke** | Research, PPT, documentation |
+
+## Architecture
+
+- **Custom server** (`server.js`) hosts Next.js + Socket.IO on the same port
+- Real-time rooms: `kitchen-staff-dashboard`, `customer-order-{id}`
+- AI analytics endpoint (`/api/analytics`) calls Gemini with structured JSON prompt
+- ML forecasting (`/api/ml-forecast`) pipes inventory data to Python XGBoost script
+- In-memory fallbacks for DB and Redis — works out of the box with no external services
+
 ## Tech Stack
 
 | Frontend | Backend | Infrastructure |
@@ -57,19 +73,3 @@ PORT=3000
 ```bash
 npm run dev
 ```
-
-## Architecture
-
-- **Custom server** (`server.js`) hosts Next.js + Socket.IO on the same port
-- Real-time rooms: `kitchen-staff-dashboard`, `customer-order-{id}`
-- AI analytics endpoint (`/api/analytics`) calls Gemini with structured JSON prompt
-- ML forecasting (`/api/ml-forecast`) pipes inventory data to Python XGBoost script
-- In-memory fallbacks for DB and Redis — works out of the box with no external services
-
-## Team
-
-| Name | Role |
-|---|---|
-| **Sujal Birwadkar** (Lead) | CI/CD deployment, Databases |
-| **Mohit Malpote** | Full-stack development — built the entire app |
-| **Riya Phalke** | Research, PPT, documentation |
