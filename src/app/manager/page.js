@@ -3,18 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSocket } from '@/context/SocketContext';
+import KitchenTimeMachine from '@/app/components/KitchenTimeMachine';
+import AutoPilotToggle from '@/app/components/AutoPilotToggle';
 import {
   Shield, TrendingUp, AlertTriangle, Users, Cpu, FileText, ArrowUpRight,
   TrendingDown, CheckCircle, RefreshCw, BarChart2, Plus, ArrowLeft, LogOut,
-  Loader2, Sparkles, Inbox, ChevronRight, Award, Trophy, Timer
+  Loader2, Sparkles, Inbox, ChevronRight, Award, Trophy, Timer, Clock
 } from 'lucide-react';
 
 export default function ManagerDashboard() {
   const router = useRouter();
   const { socket } = useSocket();
 
-  // Active Tab: 'inventory' | 'operations' | 'staff'
-  const [activeTab, setActiveTab] = useState('inventory');
+  // Active Tab: 'inventory' | 'operations' | 'staff' | 'timeline'
+  const [activeTab, setActiveTab] = useState('timeline');
 
   // Metrics
   const [metrics, setMetrics] = useState({
@@ -176,7 +178,8 @@ export default function ManagerDashboard() {
           {[
             { id: 'inventory', label: 'Inventory & Forecasting' },
             { id: 'operations', label: 'Operations & Business Charts' },
-            { id: 'staff', label: 'Staff Performance & Availability' }
+            { id: 'staff', label: 'Staff Performance & Availability' },
+            { id: 'timeline', label: 'Kitchen Time Machine' }
           ].map(tab => (
             <button
               key={tab.id}
@@ -367,6 +370,9 @@ export default function ManagerDashboard() {
           {activeTab === 'operations' && (
             <div className="space-y-8 animate-in fade-in duration-300">
               
+              {/* Auto-Pilot Mode */}
+              <AutoPilotToggle socket={socket} />
+
               {/* Operations KPI metrics bar */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                 <div className="rounded-3xl border border-zinc-800 bg-zinc-900/30 p-6 flex flex-col justify-between">
@@ -687,6 +693,11 @@ export default function ManagerDashboard() {
               </div>
 
             </div>
+          )}
+
+          {/* TAB 4: KITCHEN TIME MACHINE */}
+          {activeTab === 'timeline' && socket && (
+            <KitchenTimeMachine socket={socket} />
           )}
 
         </main>

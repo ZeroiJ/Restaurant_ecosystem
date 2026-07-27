@@ -7,6 +7,7 @@ import {
   ChefHat, Users, Bell, AlertTriangle, Play, CheckCircle2, Clock, Check,
   User, Power, Loader2, Sparkles, RefreshCw, AudioLines, Utensils, Award
 } from 'lucide-react';
+import PipelineVisualization from '@/app/components/PipelineVisualization';
 
 export default function KitchenStaffUnified() {
   const router = useRouter();
@@ -420,6 +421,11 @@ export default function KitchenStaffUnified() {
             </div>
           </div>
         )}
+
+        {/* Pipeline Visualization */}
+        <div className="lg:col-span-3">
+          <PipelineVisualization orders={orders} />
+        </div>
 
         {/* Right Columns: Main Workspace Grid */}
         <div className="lg:col-span-3 space-y-6">

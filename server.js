@@ -30,6 +30,9 @@ app.prepare().then(() => {
   const activeAlerts = new Map();
   // Active kitchen orders in prep (live memory buffer for fast push)
   const activeOrders = new Map();
+  let autoPilotEnabled = false;
+  // Kitchen Time Machine: in-memory status change log
+  const statusLog = [];
 
   io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
@@ -64,6 +67,7 @@ app.prepare().then(() => {
     socket.on('place-order', (order) => {
       console.log('New order received:', order);
       activeOrders.set(order.id, order);
+      statusLog.push({ orderId: order.id, status: 'PENDING', tableNo: order.tableNo, timestamp: Date.now(), items: order.items });
       // Broadcast to kitchen-staff-dashboard (both chefs & waiters see incoming tickets)
       io.to('kitchen-staff-dashboard').emit('new-order', order);
     });
@@ -72,6 +76,9 @@ app.prepare().then(() => {
     socket.on('update-order-status', ({ orderId, status }) => {
       console.log(`Order ${orderId} updated to status: ${status}`);
       
+      const orderDetails = activeOrders.get(orderId);
+      statusLog.push({ orderId, status, tableNo: orderDetails ? orderDetails.tableNo : 'N/A', timestamp: Date.now(), items: orderDetails ? orderDetails.items : [] });
+
       if (status === 'PAID') {
         // 1. Evict order from active cache immediately when paid
         activeOrders.delete(orderId);
@@ -90,12 +97,16 @@ app.prepare().then(() => {
       
       // If status is READY_TO_SERVE, send alert specifically to waiters
       if (status === 'READY_TO_SERVE') {
-        const orderDetails = activeOrders.get(orderId);
         io.to('kitchen-staff-dashboard').emit('dish-ready-pickup', { 
           orderId, 
           tableNo: orderDetails ? orderDetails.tableNo : 'N/A' 
         });
       }
+    });
+
+    // Kitchen Time Machine: return full timeline on request
+    socket.on('get-timeline', () => {
+      socket.emit('timeline-data', statusLog);
     });
 
     // Customer pings staff or requests checkout
@@ -107,6 +118,12 @@ app.prepare().then(() => {
         activeAlerts.set(tableNo, { type, timestamp: Date.now() });
       }
       io.to('kitchen-staff-dashboard').emit('table-alerts-updated', Array.from(activeAlerts.entries()));
+    });
+
+    // Auto-Pilot toggle from manager dashboard
+    socket.on('toggle-auto-pilot', ({ enabled }) => {
+      autoPilotEnabled = enabled;
+      console.log(`[Auto-Pilot] ${enabled ? 'ENABLED' : 'DISABLED'}`);
     });
 
     socket.on('disconnect', () => {
@@ -136,6 +153,52 @@ app.prepare().then(() => {
       }
     }
   }, 5 * 60 * 1000);
+
+  // Auto-Pilot: monitors order saturation every 30s
+  setInterval(async () => {
+    if (!autoPilotEnabled) return;
+
+    const preparingOrders = [];
+    for (const order of activeOrders.values()) {
+      if (order.status === 'PREPARING') {
+        preparingOrders.push(order);
+      }
+    }
+
+    const count = preparingOrders.length;
+    if (count === 0) return;
+
+    // Fetch menu to resolve item IDs to categories
+    let menuItems = [];
+    try {
+      const res = await fetch(`http://localhost:${port}/api/menu`);
+      if (res.ok) menuItems = await res.json();
+    } catch (e) {
+      console.error('[Auto-Pilot] Failed to fetch menu:', e.message);
+      return;
+    }
+
+    const itemCategory = {};
+    for (const item of menuItems) itemCategory[item.id] = item.category;
+
+    const affectedCategories = new Set();
+    for (const order of preparingOrders) {
+      for (const item of order.items) {
+        const cat = itemCategory[item.id];
+        if (cat) affectedCategories.add(cat);
+      }
+    }
+
+    const categories = Array.from(affectedCategories);
+
+    if (count > 4) {
+      console.log(`[Auto-Pilot] PAUSE: ${count} orders, pausing: ${categories.join(', ')}`);
+      io.emit('auto-pilot-action', { action: 'pause', categories, saturation: count });
+    } else if (count <= 2) {
+      console.log(`[Auto-Pilot] RESUME: ${count} orders, resuming: ${categories.join(', ')}`);
+      io.emit('auto-pilot-action', { action: 'resume', categories, saturation: count });
+    }
+  }, 30 * 1000);
 
   httpServer.listen(port, (err) => {
     if (err) throw err;
