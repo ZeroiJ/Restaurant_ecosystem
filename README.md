@@ -26,6 +26,14 @@ A unified real-time platform connecting every role in a restaurant:
 
 Also includes an **XGBoost ML forecast script** that predicts 7-day menu demand and ingredient depletion.
 
+## What Makes It Unique
+
+- **Not another food delivery app** — this is an operations platform for the restaurant itself, not a Zomato/Swiggy clone
+- **Every role on one real-time canvas** — customer, kitchen, waiter, and manager are all connected through Socket.IO with zero polling
+- **AI that actually helps** — Gemini generates actionable ops insights (not generic chatbot), XGBoost forecasts ingredient depletion 7 days ahead
+- **Graceful degradation** — DB or Redis down? Falls back to in-memory. No Gemini key? Mock insights kick in. The app never crashes.
+- **Custom server architecture** — Next.js and Socket.IO share one port, one process. No separate WebSocket server to manage.
+
 ## Live Demo
 
 [restaurantecosystem-production.up.railway.app](https://restaurantecosystem-production.up.railway.app)
