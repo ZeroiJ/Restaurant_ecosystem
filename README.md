@@ -2,6 +2,14 @@
 
 > Team Skill Issue — Hackathon Project — Real-time restaurant ecosystem with AI-powered manager insights.
 
+## Team
+
+| Name | Role |
+|---|---|
+| **Sujal Birwadkar** (Lead) | CI/CD deployment, Databases |
+| **Mohit Malpote** | Full-stack development — built the entire app |
+| **Riya Phalke** | Research, PPT, documentation |
+
 ## The Problem
 
 Restaurants run on chaos. Kitchen staff can't see orders in real time. Waiters run around blind. Managers guess when to restock. Customers wave their hands for the check.
@@ -14,14 +22,6 @@ A unified real-time platform connecting every role in a restaurant:
 - **Kitchen Staff** — See orders pop up in real time, mark prep stages, trigger pickup alerts
 - **Wait Staff** — Receive table calls (waiter / checkout), coordinate deliveries
 - **Manager** — Dashboard with revenue, inventory, staff performance, and **AI-generated operations insights**
-
-## Team
-
-| Name | Role |
-|---|---|
-| **Sujal Birwadkar** (Lead) | CI/CD deployment, Databases |
-| **Mohit Malpote** | Full-stack development — built the entire app |
-| **Riya Phalke** | Research, PPT, documentation |
 
 ## Architecture
 
